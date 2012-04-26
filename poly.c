@@ -1,8 +1,9 @@
-#include "poly.h"
 #include <malloc.h>
 #include <stdlib.h>
 
-double poly_neville(double* x, double* f, double t, int n)
+#include "poly.h"
+
+double poly_neville(double *x, double *f, double t, int n)
 {
     double* array = malloc(n * sizeof(double));
     int i, j;
