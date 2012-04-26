@@ -32,7 +32,7 @@ void poly_neville_array(double *x, double *f, int n, double *t, double *out, int
 }
 
 
-double poly_de_casteljau(double *b, double t, int n)
+double poly_de_casteljau(double *b, double t, int n, int n_deriv)
 {
     double *array = malloc(n * sizeof(double));
     if (!array) {
@@ -46,9 +46,16 @@ double poly_de_casteljau(double *b, double t, int n)
 	array[i] = b[i];
     }
 
-    for (i = 1; i < n; i++) {
+    for (i = 1; i < n - n_deriv; i++) {
 	for (j = 0; j < n - i; j++) {
 	    array[j] = t * array[j + 1] + (1 - t) * array[j];
+	}
+    }
+
+    for (i = n - n_deriv; i < n; i++) {
+	for (j = 0; j < n - i; j++) {
+	    array[j] = array[j + 1] - array[j];
+	    array[j] *= i;
 	}
     }
 
@@ -58,11 +65,11 @@ double poly_de_casteljau(double *b, double t, int n)
 }
 
 
-void poly_de_casteljau_array(double *b, int n, double *t, double *out, int m)
+void poly_de_casteljau_array(double *b, int n, int n_deriv, double *t, double *out, int m)
 {
     int i;
     
     for (i = 0; i < m; i++) {
-	out[i] = poly_de_casteljau(b, t[i], n);
+	out[i] = poly_de_casteljau(b, t[i], n, n_deriv);
     }
 }
