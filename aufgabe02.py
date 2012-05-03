@@ -6,7 +6,7 @@ _ndpointer_double = np.ctypeslib.ndpointer(dtype=np.double,
                                            ndim=1,
                                            flags='C_CONTIGUOUS')
 
-_libpoly = np.ctypeslib.load_library('libpoly', '.')
+_libpoly = np.ctypeslib.load_library('libpoly', 'build')
 _libpoly.poly_de_casteljau_array.argtypes = [_ndpointer_double,
                                              ctypes.c_int,
                                              ctypes.c_int,
@@ -15,8 +15,8 @@ _libpoly.poly_de_casteljau_array.argtypes = [_ndpointer_double,
                                              ctypes.c_int]
 
 def poly_de_casteljau(points, t, n_deriv=0):
-    points = np.asarray(points, dtype=np.double)
-    t = np.asarray(t, dtype=np.double)
+    points = np.ascontiguousarray(points, dtype=np.double)
+    t = np.ascontiguousarray(t, dtype=np.double)
     out_all_dims = []
     for b in points:
         out = np.empty(t.size, np.double)

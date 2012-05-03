@@ -6,7 +6,7 @@ _ndpointer_double = np.ctypeslib.ndpointer(dtype=np.double,
                                            ndim=1,
                                            flags='C_CONTIGUOUS')
 
-_libpoly = np.ctypeslib.load_library('libpoly', '.')
+_libpoly = np.ctypeslib.load_library('libpoly', 'build')
 _libpoly.poly_neville_array.argtypes = [_ndpointer_double,
                                         _ndpointer_double,
                                         ctypes.c_int,
@@ -15,8 +15,8 @@ _libpoly.poly_neville_array.argtypes = [_ndpointer_double,
                                         ctypes.c_int]
 
 def poly_neville(x, f, t):
-    x = np.asarray(x, dtype=np.double)
-    f = np.asarray(f, dtype=np.double)
+    x = np.ascontiguousarray(x, dtype=np.double)
+    f = np.ascontiguousarray(f, dtype=np.double)
     assert x.size == f.size
     assert np.unique(x).shape == x.shape
     out = np.empty(t.size, dtype=np.double)
