@@ -40,7 +40,7 @@ def main():
 
     ax2 = fig.add_subplot(122, sharex=ax1, sharey=ax1)
     dp_x, dp_y = poly_de_casteljau([x, y], t, 1)
-    ax2.plot(x.ptp() * t, dp_y / dp_x, label=r'$\frac{dy}{dx}$')
+    ax2.plot(x.ptp() * t + x.min(), dp_y / dp_x, label=r'$\frac{dy}{dx}$')
     ax2.legend(loc='upper left')
     fig.tight_layout()
     plt.show()
