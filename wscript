@@ -12,4 +12,3 @@ def configure(ctx):
 
 def build(bld):
     bld.shlib(source='poly.c', target='poly')
-    bld.program(source='aufgabe01.c poly.c', target='aufgabe01')
