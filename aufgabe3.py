@@ -2,9 +2,10 @@ import ctypes
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-from quickvis import Interact
-import guidata.dataset.dataitems as di
+from quickvis import interact
+#import guidata.dataset.dataitems as di
 from math import floor, log
+import traits.api as traits 
 
 _ndpointer_complex = np.ctypeslib.ndpointer(dtype=np.complex,
                                             ndim=1,
@@ -38,18 +39,23 @@ def triag(x):
     y = np.where(x < - np.pi / 2, + 2 * x + 2 * np.pi, y)
     return y
 
+func_map = {'saw': saw, 'rect': rect, 'triag': triag}
 
-@Interact
+#fft = np.fft.fft
+#ifft = np.fft.ifft
+
+@interact
 def show_fft(fig,
-             func=di.ChoiceItem("Funktion",
-                        [(saw, "saw"), (rect, "rect"), (triag, "triag")]),
-             n=di.IntItem("N", default=32)):
+             func=traits.Enum(*func_map.keys(),
+                              desc="Funktion"),
+             n=traits.Int(32, desc="N")):
     
     fig.clear()
     
-    #x = np.linspace(- np.pi, np.pi, n)
-    x = 2 * np.pi * np.arange(n) / n - np.pi
-    y = func(x)
+    x = np.linspace(- np.pi, np.pi, n)
+    #x = 2 * np.pi * np.arange(n) / n - np.pi
+    y = func_map[func](x)
+    y_f = fft(y)
     
     gs = gridspec.GridSpec(3, 2)
     
@@ -58,19 +64,19 @@ def show_fft(fig,
     ax.legend(loc='upper left')
     
     ax = fig.add_subplot(gs[1, 0])
-    ax.plot(x, fft(y).real, label=r'$\Re(F(f))$')
+    ax.plot(x, np.abs(y_f), label=r'$|F(f)|$')
     ax.legend()
     
     ax = fig.add_subplot(gs[1, 1], sharex=ax)
-    ax.plot(x, fft(y).imag, label=r'$\Im(F(f))$')
+    ax.plot(x, np.angle(y_f), label=r'$\varphi(F(f))$')
     ax.legend()
     
     ax = fig.add_subplot(gs[2, 0])
-    ax.plot(x, ifft(fft(y)).real, label=r'$\Re\tilde FF(f)$')
+    ax.plot(x, ifft(y_f).real, label=r'$\Re\tilde FF(f)$')
     ax.legend(loc='upper left')
     
     ax = fig.add_subplot(gs[2, 1], sharex=ax)
-    ax.plot(x, ifft(fft(y)).imag, label=r'$\Im\tilde FF(f)$')
+    ax.plot(x, ifft(y_f).imag, label=r'$\Im\tilde FF(f)$')
     ax.legend(loc='upper left')
     
     fig.tight_layout()

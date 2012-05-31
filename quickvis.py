@@ -1,137 +1,178 @@
 import inspect, sys
-import guidata
-import guidata.dataset.dataitems as di
-import guidata.dataset.datatypes as dt
-from guidata.dataset.qtwidgets import DataSetEditGroupBox
-from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
+
+import matplotlib
+matplotlib.use('Qt4Agg')
+
+from traits.etsconfig.api import ETSConfig
+ETSConfig.toolkit = 'qt4'
+
+import traits.api as traits
+import traitsui.api as traitsui
+from collections import OrderedDict
+
 from matplotlib.pyplot import Figure
-from PyQt4 import QtGui, QtCore
+from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt4 import NavigationToolbar2QT
 
-class Interact(QtCore.QObject):
-    def __init__(self, func):
-        QtCore.QObject.__init__(self)
-        self._func = func
-        
-        class Form(dt.DataSet):
-            pass
-        
-        self._form = Form
-        self._process_args()
-        self._figure = Figure()
-        self._widget = None
-        
-        self._app = guidata.qapplication()
-    
-    def _process_args(self):
-        args, varargs, keywords, defaults = inspect.getargspec(self._func)
-        if varargs is not None or keywords is not None:
-            raise ValueError("Illegal arguments")
-        
-        single_args = args[:len(args) - len(defaults)]
-        default_args = args[len(args) - len(defaults):]
-        
-        for i, name_default in enumerate(zip(default_args, defaults)):
-            name, default = name_default
-            if not isinstance(default, di.DataItem):
-                raise ValueError("Illegal arguments, not a DataItem: " + name)
-            self._form._items.append(default)
-            self._form._items[-1].set_name(name)
-            self._form._items[-1]._order = i + 1
-        
-        if len(single_args) > 1:
-            raise ValueError("Illegal arguments")
-    
-    def edit_data(self):
-        self._form.edit()
-        return self._form
-    
-    def _get_qtwidget(self, parent=None):
-        self._widget = DataSetEditGroupBox(None, self._form)
-        self._widget.setParent(parent)
+from traitsui.qt4.editor import Editor
+from traitsui.qt4.basic_editor_factory import BasicEditorFactory
+
+from PyQt4 import QtGui
+
+import threading
+
+class _MPLFigureEditor(Editor):
+
+    scrollable  = True
+
+    def init(self, parent):
+        self.control = self._create_canvas(parent)
+        self.set_tooltip()
+
+    def update_editor(self):
+        pass
+
+    def _create_canvas(self, parent):
+        """ Create the MPL canvas. """
+        self._widget = QtGui.QWidget()
+        self._mpl_control = FigureCanvas(self.value)
+        self._toolbar = NavigationToolbar2QT(self._mpl_control, self._widget) 
+        layout = QtGui.QVBoxLayout()
+        layout.addWidget(self._toolbar)
+        layout.addWidget(self._mpl_control)
+        self._widget.setLayout(layout)
+
         return self._widget
+
+class MPLFigureEditor(BasicEditorFactory):
+
+    klass = _MPLFigureEditor
+
+
+class FuncWorker(threading.Thread):
+    def __init__(self, orig_func, finish_func, fig, *args, **kwargs):
+        threading.Thread.__init__(self)
+        self.func = orig_func
+        self.fig = fig
+        self.finish_func = finish_func
+        self.args = args
+        self.kwargs = kwargs
+        
+    def run(self):
+        self.func(self.fig, *self.args, **self.kwargs)
+        self.finish_func()
+
+
+def interact(func):
     
-    def show_gui(self):
-        main_window = ApplicationWindow(self)
-        main_window.show()
-        self._app.exec_()
+    Options = build_options_type(func)
+
+    class QuickvisGUI(traits.HasTraits):
         
-    def _apply_func(self):
-        assert self._widget is not None
-        args = {}
-        for widget in self._widget.edit.widgets:
-            args[widget.item.item._name] = widget.item.get()
-        try:
-            self._func(self._figure, **args)
-            self.emit(QtCore.SIGNAL("figure_changed()"))
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            QtGui.QMessageBox.warning(None, type(e).__name__, e.message)
+        figure = traits.Instance(Figure, ())
+        apply = traits.Button
+        options = traits.Instance(Options, ())
+        options_changed = traits.Bool(True)
+        running = traits.Bool(False)
+        
+        view = traitsui.View(
+                   traitsui.Tabbed(
+                       traitsui.Group(
+                            traitsui.Item(
+                                'options',
+                                style='custom',
+                                show_label=False,
+                                enabled_when='not running'),
+                            traitsui.Group(
+                                traitsui.Spring(),
+                                traitsui.Item(
+                                    'apply',
+                                    show_label=False,
+                                    enabled_when='options_changed'),
+                                orientation='horizontal',
+                                dock='tab'),
+                           label='options',
+                           dock='tab'),
+                       traitsui.Item(
+                           'figure', 
+                            editor=MPLFigureEditor(),
+                            show_label=False)),
+                   dock='tab',
+                   width=800,
+                   height=600,
+                   resizable=True)
+        
+        @traits.on_trait_change('options.+')
+        def _on_options_changed(self):
+            self.options_changed = True
+        
+        @traits.on_trait_change('apply')
+        def redraw(self):
+            if self.running:
+                return 
             
-        
-        
-    def __call__(self, *args, **kwargs):
-        return self._func(*args, **kwargs)
+            self.options_changed = False
+            self.figure.clear()
+            self.running = True
+            
+            def finish_func():
+                self.running = False
+                self.figure.canvas.draw()
+                
+            self.worker = FuncWorker(func, finish_func, self.figure, 
+                                     **self.options.get())
+            self.worker.start()
+    
+    class NewFunc(object):
+        def __init__(self):
+            self.func = func
+            
+        def __call__(self, *args, **kwargs):
+            self.func(*args, **kwargs)
+            
+        def show_gui(self):
+            window = QuickvisGUI()
+            window.configure_traits()
+            window.redraw()
+    
+    return NewFunc()
 
 
-class MplCanvas(FigureCanvas):
-    """Ultimately, this is a QWidget (as well as a FigureCanvasAgg, etc.)."""
-    def __init__(self, parent=None, figure=None):
+def build_options_type(func):
+    args, varargs, keywords, defaults = inspect.getargspec(func)
+    if varargs is not None or keywords is not None:
+        raise ValueError("Illegal arguments")
+    
+    single_args = args[:len(args) - len(defaults)]
+    default_args = args[len(args) - len(defaults):]
+    
+    arg_defaults = OrderedDict()
+    
+    for name, default in zip(default_args, defaults):
+        if not isinstance(default, traits.TraitType):
+            raise ValueError("Illegal arguments, not a Trait: " + name)
+        arg_defaults[name] = default
+    
+    if len(single_args) != 1:
+        raise ValueError("Illegal arguments")
+    
+    if 'view' in arg_defaults:
+        raise ValueError()
+    
+    arg_defaults['view'] = traitsui.View(*arg_defaults.keys())
+    
+    return traits.MetaHasTraits("Form", (traits.HasTraits,), arg_defaults)
 
-        FigureCanvas.__init__(self, figure)
-        self.setParent(parent)
-
-        FigureCanvas.setSizePolicy(self,
-                                   QtGui.QSizePolicy.Expanding,
-                                   QtGui.QSizePolicy.Expanding)
-        FigureCanvas.updateGeometry(self)
-
-
-class ApplicationWindow(QtGui.QMainWindow):
-    def __init__(self, interact):
-        QtGui.QMainWindow.__init__(self)
-        self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
-        self.setWindowTitle("application main window")
-        
-        data_widget = interact._get_qtwidget(parent=self)
-        mpl_widget = MplCanvas(parent=self, figure=interact._figure)
-        
-        l = QtGui.QVBoxLayout()
-        l.addWidget(data_widget)
-        l.addStretch()
-        
-        data_widget_top = QtGui.QWidget()
-        data_widget_top.setLayout(l)
-        
-        data_widget_dock = QtGui.QDockWidget()
-        data_widget_dock.setWidget(data_widget_top)
-        
-        toolbar = NavigationToolbar(mpl_widget, self)
-        
-        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, data_widget_dock)
-        self.addToolBar(QtCore.Qt.TopToolBarArea, toolbar)
-        
-        self.connect(data_widget, QtCore.SIGNAL("apply_button_clicked()"),
-                     interact._apply_func)
-        self.connect(interact, QtCore.SIGNAL("figure_changed()"),
-                     mpl_widget.draw)
-
-        self.setCentralWidget(mpl_widget)
-
-
-    def fileQuit(self):
-        self.close()
-
-    def closeEvent(self, ce):
-        self.fileQuit()
 
 def beispiel():
-    @Interact
-    def func(fig, a=di.ChoiceItem("Faktor", ["a", "b"])):
+    @interact
+    def func(fig, num=traits.Enum("Faktor", "b"), num2=traits.Bool()):
         import numpy as np
         ax = fig.add_subplot(111)
         ax.plot(np.linspace(0, 1), a * np.linspace(0, 1)**2)
     
     func.show_gui()
+    
+if __name__ == '__main__':
+    beispiel()
     
