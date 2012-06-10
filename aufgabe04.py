@@ -39,6 +39,19 @@ def integrate_romberg(f, a, b, n, operations=False):
         return res
 
 
+def f(x):
+    return 1.0 / x
+
+def print_errors(k_values, m_values):
+    for k in k_values:
+        print
+        print "k = {}, mit ln(10^k) = {}".format(k, k * log(10))
+        print "========="
+        for m in m_values:
+            approx_log = integrate_romberg(f, 1, 10 ** k, m)
+            print " m = {}, romberg liefert {}. Fehler ist {}".format(
+                            m, approx_log, k * log(10) - approx_log)
+
 @interact
 def main(fig,
          k_values_plot=traits.Expression('[2, 4, 6]'),
@@ -46,17 +59,9 @@ def main(fig,
          log_x=traits.Bool(True),
          show_fit=traits.Bool(True)):
 
-    def f(x):
-        return 1.0 / x
-
     k_values_plot = eval(k_values_plot)
-    k_values = [-6, -4, -2, 0, 2, 4, 6]
-    m_values = list(range(1, m_max))
 
-    for k, m in product(k_values, m_values):
-        approx_log = integrate_romberg(f, 1, 10 ** k, m)
-        print "k = {: }, m = {}, ln ist {}. Fehler ist {}".format(
-                            k, m, approx_log, k * log(10) - approx_log)
+    m_values = list(range(1, m_max))
 
     ax = fig.add_subplot(111)
     if log_x:
@@ -69,10 +74,11 @@ def main(fig,
     for k in k_values_plot:
         ops = []
         error = []
+        integral = k * np.log(10)
         for m in m_values:
             res, calls, operations = integrate_romberg(f, 1, 10 ** k, m, True)
             ops.append(calls + operations)
-            error.append(abs(res - k * log(10)))
+            error.append(abs(res - integral))
         ax.plot(ops, error, label='$k = {}$'.format(k))
 
         if show_fit:
@@ -95,9 +101,8 @@ def main(fig,
                     rotation=trans_angle,
                     ha='right', va='center')
 
-
     ax.legend(loc='lower left')
 
-
 if __name__ == '__main__':
+    print_errors([-6, -4, -2, 0, 2, 4, 6], range(1, 8))
     main.show_gui()
