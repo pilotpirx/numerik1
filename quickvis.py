@@ -120,7 +120,7 @@ def interact(func):
                 self.figure.canvas.draw()
                 
             self.worker = FuncWorker(func, finish_func, self.figure, 
-                                     **self.options.get())
+                                     **self.options.get_trait_values())
             self.worker.start()
     
     class NewFunc(object):
@@ -149,7 +149,7 @@ def build_options_type(func):
     arg_defaults = OrderedDict()
     
     for name, default in zip(default_args, defaults):
-        if not isinstance(default, traits.TraitType):
+        if not isinstance(default, (traits.TraitType, traits.CTrait)):
             raise ValueError("Illegal arguments, not a Trait: " + name)
         arg_defaults[name] = default
     
@@ -157,9 +157,32 @@ def build_options_type(func):
         raise ValueError("Illegal arguments")
     
     if 'view' in arg_defaults:
-        raise ValueError()
+        raise ValueError('Argument name "view" is not allowed')
     
     arg_defaults['view'] = traitsui.View(*arg_defaults.keys())
+    
+    # handle mapped traits
+    trait_values = []
+    for name, trait in zip(default_args, defaults):
+        if trait.is_mapped:
+            trait_values.append(name + '_')
+        else:
+            trait_values.append(name)
+    
+    arg_defaults['_trait_values'] = trait_values 
+
+
+    def get_trait_values(self):
+        values = self.trait_get(self._trait_values)
+        result = {}
+        for key in self.trait_get(self._trait_values):
+            if key.endswith('_'):
+                result[key[:-1]] = values[key]
+            else:
+                result[key] = values[key]
+        return result
+                
+    arg_defaults['get_trait_values'] = get_trait_values
     
     return traits.MetaHasTraits("Form", (traits.HasTraits,), arg_defaults)
 
