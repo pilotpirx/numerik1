@@ -6,7 +6,9 @@ def options(opt):
 
 def configure(ctx):
     ctx.load('compiler_c python')
-    ctx.env.append_unique('CFLAGS', ['-O3', '-Wall'])
+    ctx.env.append_unique('CFLAGS_opt', '-O3')
+    ctx.env.append_unique('CFLAGS_debug', '-Wall')
+    ctx.env.append_unique('CFLAGS_debug', '-ggdb')
     ctx.check_python_module('numpy', mandatory=False)
     ctx.check_python_module('scipy', mandatory=False)
     ctx.check_python_module('matplotlib', mandatory=False)
@@ -20,6 +22,10 @@ def configure(ctx):
     ctx.check(header_name='gsl/gsl_complex_math.h')
 
 def build(bld):
-    bld.shlib(source='poly.c', target='poly')
-    bld.shlib(source='fft.c', target='fft', use=['gsl', 'm', 'cblas'])
-    bld.shlib(source='integrate.c', target='integrate', use='m')
+    bld.shlib(source='poly.c', target='poly', use='opt')
+    bld.shlib(source='fft.c', target='fft', use='gsl m cblas opt')
+    bld.shlib(source='integrate.c', target='integrate', use='m opt')
+
+    bld.shlib(source='poly.c', target='poly_d', use='debug')
+    bld.shlib(source='fft.c', target='fft_d', use='gsl m cblas debug')
+    bld.shlib(source='integrate.c', target='integrate_d', use='debug')
