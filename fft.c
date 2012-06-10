@@ -6,8 +6,7 @@
 
 #define PI 3.1415926535897932384626433832795028841971
 
-void fft_recurse(gsl_complex *data, int length, int stride,
-        gsl_complex *out)
+void fft_recurse(gsl_complex *data, int length, int stride, gsl_complex *out)
 {
     int k;
     gsl_complex *inner_out;
@@ -43,7 +42,6 @@ void fft_recurse(gsl_complex *data, int length, int stride,
 
     free(inner_out);
 }
-
 
 void fft(gsl_complex *data, int length)
 {

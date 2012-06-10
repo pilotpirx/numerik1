@@ -2,11 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 
-
-double integrate_trapezoidal(double (*f) (double),
-                             double a,
-                             double b,
-                             int n)
+double integrate_trapezoidal(double (*f)(double), double a, double b, int n)
 {
     int i;
     double result = 0;
@@ -23,13 +19,8 @@ double integrate_trapezoidal(double (*f) (double),
     return result;
 }
 
-
-double integrate_romberg(double (*f) (double),
-                         double a,
-                         double b,
-                         int m,
-                         int *num_calls,
-                         int *num_operations)
+double integrate_romberg(double (*f)(double), double a, double b, int m,
+                         int *num_calls, int *num_operations)
 {
     int i, j;
     double h = b - a;
@@ -76,6 +67,9 @@ double integrate_romberg(double (*f) (double),
             tmp *= 4;
             romberg_table[j] = romberg_table[j + 1]
                     + (romberg_table[j + 1] - romberg_table[j]) / (tmp - 1);
+            //romberg_table[j] = (romberg_table[j + 1] * tmp
+            //                    - romberg_table[j])
+            //                    / (tmp - 1);
         }
 
         n *= 2;
